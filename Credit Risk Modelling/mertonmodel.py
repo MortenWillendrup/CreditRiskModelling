@@ -65,7 +65,7 @@ import pandas as pd
 df = pd.DataFrame(data=np.linspace(0, 200, 200,  dtype=int), columns=['V'] )
 
 param={
-            "v" : 130,
+            "v" : 180,
             "Ds" : 50,
             "Dj" : 50,
             "r" : 0.01,
@@ -100,8 +100,6 @@ def Senior_debt(v, ds, T, r, sigma):
 
     return Senior_debt
 
-# print(Senior_debt(param['v'],param['Ds'],param['T'],param['r'],param['sigma']))
-
 def Junior_debt(v, ds, dj, T, r, sigma):
     # S     : value of firm
     # ds    : senior debt
@@ -114,7 +112,6 @@ def Junior_debt(v, ds, dj, T, r, sigma):
     d2 = d1 - sigma * np.sqrt(T)
 
     Junior_debt = Senior_debt(v, ds, T, r, sigma) - (v * si.norm.cdf(d1, 0.0, 1.0) - (ds+dj) * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
-
     return Junior_debt
 
 def sub_equity(v, ds, dj, T, r, sigma):
@@ -129,17 +126,18 @@ def sub_equity(v, ds, dj, T, r, sigma):
     d2 = d1 - sigma * np.sqrt(T)
 
     sub_equity = (v * si.norm.cdf(d1, 0.0, 1.0) - (ds+dj) * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
-
     return sub_equity
 
+param={
+            "v" : 180,
+            "Ds" : 50,
+            "Dj" : 50,
+            "r" : 0.01,
+            "sigma" : 0.25,
+            "T" : 1
+            }
 
-
-print(sub_equity(param['v'],param['Ds'], param['Dj'], param['T'], param['r'], param['sigma']))
-
-
-
-
-
+print(Junior_debt(param['v'],param['Ds'], param['Dj'], 15, param['r'], param['sigma']))
 
 df2 = pd.DataFrame(data=np.linspace(1, 30, 30,  dtype=int), columns=['T'] )
 
