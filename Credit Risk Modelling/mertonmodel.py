@@ -64,7 +64,7 @@ import pandas as pd
 
 df = pd.DataFrame(data=np.linspace(0, 200, 200,  dtype=int), columns=['V'] )
 
-parameters={
+param={
             "v" : 130,
             "Ds" : 50,
             "Dj" : 50,
@@ -86,5 +86,69 @@ plt.legend(['Debt','Equity'], ncol=2, loc='upper left')
 
 plt.show()
 
+def Senior_debt(v, ds, T, r, sigma):
+    # S: spot price
+    # K: strike price
+    # T: time to maturity
+    # r: interest rate
+    # sigma: volatility of underlying asset
+
+    d1 = (np.log(v / ds) + (0.5 * sigma ** 2) * T + r*T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+
+    Senior_debt = v - (v * si.norm.cdf(d1, 0.0, 1.0) - ds * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
+
+    return Senior_debt
+
+# print(Senior_debt(param['v'],param['Ds'],param['T'],param['r'],param['sigma']))
+
+def Junior_debt(v, ds, dj, T, r, sigma):
+    # S     : value of firm
+    # ds    : senior debt
+    # dj    : junior debt
+    # T     : time to maturity
+    # r: interest rate
+    # sigma: volatility of underlying asset
+
+    d1 = (np.log(v / (ds+dj)) + (0.5 * sigma ** 2) * T + r*T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+
+    Junior_debt = Senior_debt(v, ds, T, r, sigma) - (v * si.norm.cdf(d1, 0.0, 1.0) - (ds+dj) * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
+
+    return Junior_debt
+
+def sub_equity(v, ds, dj, T, r, sigma):
+    # S     : value of firm
+    # ds    : senior debt
+    # dj    : junior debt
+    # T     : time to maturity
+    # r: interest rate
+    # sigma: volatility of underlying asset
+
+    d1 = (np.log(v / (ds+dj)) + (0.5 * sigma ** 2) * T + r*T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+
+    sub_equity = (v * si.norm.cdf(d1, 0.0, 1.0) - (ds+dj) * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
+
+    return sub_equity
 
 
+
+print(sub_equity(param['v'],param['Ds'], param['Dj'], param['T'], param['r'], param['sigma']))
+
+
+
+
+
+
+df2 = pd.DataFrame(data=np.linspace(1, 30, 30,  dtype=int), columns=['T'] )
+
+df2['Senior debt'] = Senior_debt(param['v'],param['Ds'],df2['T'],param['r'],param['sigma'])
+
+df2['Junior debt'] = Junior_debt(param['v'],param['Ds'], param['Dj'], df2['T'],param['r'], param['sigma'])
+
+df2['Equity'] = sub_equity(param['v'],param['Ds'], param['Dj'], df2['T'],param['r'], param['sigma'])
+
+sns.lineplot(data=[df2['Senior debt'], df2['Junior debt'], df2['Equity']])
+
+plt.show()
