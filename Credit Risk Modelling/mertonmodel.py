@@ -86,6 +86,19 @@ plt.legend(['Debt','Equity'], ncol=2, loc='upper left')
 
 plt.show()
 
+
+
+import numpy as np
+import scipy.stats as si
+import pandas as pd
+import sympy as sy
+from sympy.stats import Normal, cdf
+from sympy import init_printing
+init_printing()
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set()
+
 def Senior_debt(v, ds, T, r, sigma):
     # S: spot price
     # K: strike price
@@ -99,7 +112,6 @@ def Senior_debt(v, ds, T, r, sigma):
     Senior_debt = v - (v * si.norm.cdf(d1, 0.0, 1.0) - ds * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
 
     return Senior_debt
-
 def Junior_debt(v, ds, dj, T, r, sigma):
     # S     : value of firm
     # ds    : senior debt
@@ -111,9 +123,14 @@ def Junior_debt(v, ds, dj, T, r, sigma):
     d1 = (np.log(v / (ds+dj)) + (0.5 * sigma ** 2) * T + r*T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
 
-    Junior_debt = Senior_debt(v, ds, T, r, sigma) - (v * si.norm.cdf(d1, 0.0, 1.0) - (ds+dj) * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
-    return Junior_debt
+    d1_senior = (np.log(v / ds) + (0.5 * sigma ** 2) * T + r*T) / (sigma * np.sqrt(T))
+    d2_senior = d1_senior - sigma * np.sqrt(T)
 
+    Junior_debt = (v * si.norm.cdf(d1_senior, 0.0, 1.0) - ds * np.exp(-r * T) * si.norm.cdf(d2_senior, 0.0, 1.0)) \
+                  - (v * si.norm.cdf(d1, 0.0, 1.0) - (ds+dj) * np.exp(-r * T) * si.norm.cdf(d2, 0.0, 1.0))
+
+
+    return Junior_debt
 def sub_equity(v, ds, dj, T, r, sigma):
     # S     : value of firm
     # ds    : senior debt
