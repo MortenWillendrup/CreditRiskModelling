@@ -56,7 +56,7 @@ funds = pd.read_excel('USmutual.xlsx')
 
 
 
-# Creating a loop to contain the different types of mutual funds cleaning of nan and integer values
+# Creating a loop to contain the different types of mutual funds cleaning for nan and integer values
 funds_list = []
 funds_list = funds['Morningstar Category'].unique()
 funds_list = funds_list.tolist()
