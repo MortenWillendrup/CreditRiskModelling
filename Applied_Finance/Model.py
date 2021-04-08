@@ -1,16 +1,11 @@
-
-from linearmodels.datasets import french
-
-data = french.load()
-
 # Modules
 
 import pandas as pd
-
+import datetime as dt
 
 # Reading the main xlsx file of portfolios
-
 funds = pd.read_excel('USmutual.xlsx')
+
 
 # Creating a loop to contain the different types of mutual funds cleaning of nan and integer values
 funds_list = []
@@ -19,61 +14,56 @@ funds_list = funds_list.tolist()
 funds_list = [i for i in funds_list if type(i) is str]
 
 
-for fund in funds_list:
-    print(fund)
+
+
+# Creating a dict of DataFrames containing each Category
 
 fund_dict = {}
 
-
-# Creating DataFrames for each Category
 for fund in funds_list:
     fund_dict[fund.replace(" ","_").replace("-","_")] = vars()[fund.replace(" ","_").replace("-","_")] = \
         funds[(funds['Morningstar Category'] == fund) &
-              (funds['2010-01-01'].notnull()) &
+              # (funds['01-01-2010'].notnull()) &
               (funds['Ticker'].notnull())]
 
 funds_list = [fund.replace(" ","_").replace("-","_") for fund in funds_list]
-#
-# print(US_Fund_Large_Value.info)
-#
-#
-#
-# US_Fund_Large_Value = US_Fund_Large_Value.iloc[:, 29:280]
 
 
-#CLeaning for performance data
+from datetime import datetime as dt
+#Cleaning for performance data
 for fund in fund_dict:
-    fund_dict[fund] = fund_dict[fund].iloc[:, 29:280]
+    fund_dict[fund] = fund_dict[fund].iloc[:, 26:280]
+    fund_dict[fund] = fund_dict[fund].T
+    new_header = fund_dict[fund].iloc[0]
+    fund_dict[fund] = fund_dict[fund][1:]
+    fund_dict[fund].columns = new_header
+    fund_dict[fund] = fund_dict[fund].dropna(axis=1)
+    fund_dict[fund].index.name = 'Date'
 
+for fund in fund_dict:
+    fund_dict[fund].index.to_datetime(format='&Y-%m')
 
-####  - Reset from here
-    fund.drop(fund.columns[136:540], inplace=True, axis =1)
-    fund.drop(fund.columns[0:1], inplace=True, axis =1)
-    fund = fund.T
-    fund.drop(fund.columns[134:160], inplace=True, axis =0)
+for fund in fund_dict:
+    print(fund_dict[fund].index)
 
-    new_header = fund.iloc[0]
+#
+for fund in fund_dict:
+    fund_dict[fund].index = fund_dict[fund].index + pd.DateOffset(months=1)
+    fund_dict[fund].index =fund_dict[fund].index - pd.tseries.offsets.MonthEnd()
+    fund_dict[fund] = [fund_dict[fund].index.dt.year >= 2010]
 
-    fund = fund[1:]
-
-    fund.columns = new_header
-
-    fund = fund.dropna(axis=1)
-
-# df_good_data.to_csv('Large_funds_cleaned.csv', index=True)
-from dateutil.relativedelta import *
-
-
-import pandas as pd
-df_good_data =pd.read_csv('Large_funds_cleaned.csv', index_col=0)
-df_good_data.index = pd.to_datetime(df_good_data.index)
-df_good_data.index = df_good_data.index + pd.DateOffset(months=1)
-df_good_data.index = df_good_data.index - pd.tseries.offsets.MonthEnd()
+# for fund in fund_dict:
+#     fund_dict[fund].index.to_datetime()
 
 
 
 
-df_good_data.info()
+
+
+
+
+
+
 
 import pandas_datareader as reader
 from datetime import datetime
