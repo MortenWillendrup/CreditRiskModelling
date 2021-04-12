@@ -35,7 +35,7 @@ ESG = (SP_ESG.SPXESUP - SP_ESG.SP500).to_frame()
 
 # reading in the fama french factors
 factors = reader.DataReader('F-F_Research_Data_5_Factors_2x3', 'famafrench',start, end)[0]/100
-factors.index= factors.index.to_timestamp(freq='M', how='s')
+# factors.index= factors.index.to_timestamp(freq='M', how='s')
 
 factors_merged = pd.merge(factors, ESG, left_index=True, right_index=True)
 
@@ -105,50 +105,24 @@ for fund in fund_dict:
     fund_dict[fund] = fund_dict[fund].loc[start:end]
     # fund_dict[fund].to_period('M')
 
-# Check if the DataFrame coulmns are numeric
+# Changing to PeriodIndex
 for fund in fund_dict:
-    print(fund_dict[fund].apply(lambda s: pd.to_numeric(s, errors='coerce').notnull().all()))
+    fund_dict[fund] = fund_dict[fund].to_period('M')
 
-
+# Changing input from object to float64
 for fund in fund_dict:
-    mod = LinearFactorModel(portfolios=fund_dict[fund],
-                            factors=factors_merged)
-    res = mod.fit(cov_type='robust')
-    # print(res.summary)
-    # print(res.betas)
-
-
-# Running Fama MacBeth if DataFrames index matches
-
-# for fund in fund_dict:
-#     if factors_merged.index.any() == fund_dict[fund].index.any():
-#         print('Index match')
-#         mod = LinearFactorModel(portfolios=fund_dict[fund],
-#                                 factors=factors_merged)
-#         res = mod.fit(cov_type='robust')
-#         print(res.summary)
-#         print(res.betas)
-# #
-# # #Checking if the index of the DataFrames matches
-# for fund in fund_dict:
-#     print(factors_merged.index == fund_dict[fund].index)
-#
-#
-# # for fund in fund_dict:
-# mod = LinearFactorModel(portfolios=fund_dict['US_Fund_Large_Blend'],
-#                         factors=factors_merged)
-# res = mod.fit(cov_type='robust')
-# print(res.summary)
-# print('/n')
-# print('-'*20)
-# print('/n')
-# print(res.betas)
-# print('/n')
-# print('-'*20)
-# print('/n')
+    cols = fund_dict[fund].columns[fund_dict[fund].dtypes.eq(object)]
+    fund_dict[fund][cols] = fund_dict[fund][cols].apply(pd.to_numeric, errors='coerce')
 
 
 
+mod = LinearFactorModel(portfolios=fund_dict['US_Fund_Mid_Cap_Blend'],
+                        factors=factors_merged)
+res = mod.fit(cov_type='robust')
+
+print(res.summary)
+
+print(res.risk_premia)
 
 
 
