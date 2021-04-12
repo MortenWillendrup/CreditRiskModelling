@@ -105,6 +105,19 @@ for fund in fund_dict:
     fund_dict[fund] = fund_dict[fund].loc[start:end]
     # fund_dict[fund].to_period('M')
 
+# Check if the DataFrame coulmns are numeric
+for fund in fund_dict:
+    print(fund_dict[fund].apply(lambda s: pd.to_numeric(s, errors='coerce').notnull().all()))
+
+
+for fund in fund_dict:
+    mod = LinearFactorModel(portfolios=fund_dict[fund],
+                            factors=factors_merged)
+    res = mod.fit(cov_type='robust')
+    # print(res.summary)
+    # print(res.betas)
+
+
 # Running Fama MacBeth if DataFrames index matches
 
 # for fund in fund_dict:
