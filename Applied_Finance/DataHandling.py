@@ -34,7 +34,7 @@ ESG = pd.DataFrame()
 ESG = (SP_ESG.SPXESUP - SP_ESG.SP500).to_frame()
 
 # reading in the fama french factors
-factors = reader.DataReader('F-F_Research_Data_5_Factors_2x3', 'famafrench',start, end)[0]/100
+factors = reader.DataReader('F-F_Research_Data_5_Factors_2x3', 'famafrench',start, datetime(2021, 1, 31))[0]/100
 # factors.index= factors.index.to_timestamp(freq='M', how='s')
 
 factors_merged = pd.merge(factors, ESG, left_index=True, right_index=True)
@@ -114,15 +114,22 @@ for fund in fund_dict:
     cols = fund_dict[fund].columns[fund_dict[fund].dtypes.eq(object)]
     fund_dict[fund][cols] = fund_dict[fund][cols].apply(pd.to_numeric, errors='coerce')
 
+#Fama MacBeth implemention
 
+risk_premia =[]
+for fund in fund_dict:
+    mod = LinearFactorModel(portfolios=fund_dict[fund],
+                        factors=factors)
+    res = mod.fit(cov_type='robust')
 
-mod = LinearFactorModel(portfolios=fund_dict['US_Fund_Mid_Cap_Blend'],
-                        factors=factors_merged)
-res = mod.fit(cov_type='robust')
+    print(res.risk_premia)
+    risk_premia.append(res.risk_premia)
 
-print(res.summary)
+risk_premia = pd.DataFrame(risk_premia,
+                       index=fund_dict.keys(),
+                       columns=factors.columns.tolist())
+risk_premia.info()
 
-print(res.risk_premia)
 
 
 
