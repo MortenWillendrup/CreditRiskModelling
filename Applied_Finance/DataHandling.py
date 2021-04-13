@@ -71,6 +71,7 @@ fund_dict = {}
 
 for fund in funds_list:
     fund_dict[fund.replace(" ","_").replace("-","_")] = vars()[fund.replace(" ","_").replace("-","_")] = \
+        fund_dict[fund.replace(" ", "_").replace("-", "_")] = vars()[fund.replace(" ", "_").replace("-", "_")] = \
         funds[(funds['Morningstar Category'] == fund) &
               (funds['Ticker'].notnull())]
 
@@ -93,8 +94,8 @@ for fund in fund_dict:
     fund_dict[fund].index = pd.to_datetime(fund_dict[fund].index)
 
 # printing the indices to control for DatetimeIndexing
-for fund in fund_dict:
-    print(fund_dict[fund].index)
+# for fund in fund_dict:
+#     print(fund_dict[fund].index)
 
 #Adjust to end of month data
 for fund in fund_dict:
@@ -125,12 +126,68 @@ for fund in fund_dict:
     print(res.risk_premia)
     risk_premia.append(res.risk_premia)
 
+
+# Create total DataFrame
+Total = pd.DataFrame()
+Total = funds[funds['Ticker'].notnull()]
+Total = Total.iloc[:, 26:280]
+Total = Total.T
+new_header = Total.iloc[0]
+Total = Total[1:]
+Total.columns = new_header
+Total = Total.dropna(axis=1)
+
+Total.index = Total.index + pd.DateOffset(months=1)
+Total.index = Total.index - pd.tseries.offsets.MonthEnd()
+Total = Total.loc[start:end]
+Total = Total.to_period('M')
+
+Total=Total.astype(float)
+
+Total = Total.loc[:,~Total.columns.duplicated()]
+
+
+mod = LinearFactorModel(portfolios=Total,
+                        factors=factors)
+res = mod.fit(cov_type='robust')
+
+print(res.risk_premia)
+risk_premia.append(res.risk_premia)
+
+fund_dict['Total'] = Total
+
+
 risk_premia = pd.DataFrame(risk_premia,
                        index=fund_dict.keys(),
                        columns=factors.columns.tolist())
 risk_premia.info()
 
+print(risk_premia.to_latex())
+
+
+#downback plot - Not in use at the moment
+
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
+import pandas_market_calendars as mcal
+import numpy as np
+
+fig, ax = plt.subplots()
+ax = SP_ESG['ESG-SP500_cum'].plot(figsize=(10, 5), use_index=False, ylabel='Cummalative Return ESG index')
+ax.set_xlim(0, SP_ESG.index.size-1)
+ax.grid(axis='x', alpha=0.3)
 
 
 
+peaks, _ = find_peaks(SP_ESG['ESG-SP500_cum'], width=7, prominence=4)
+troughs, _ = find_peaks(-SP_ESG['ESG-SP500_cum'], width=7, prominence=4)
+for peak, trough in zip(peaks, troughs):
+    ax.axvspan(peak, trough, facecolor='red', alpha=.2)
 
+ax.set_ylim(*ax.get_ylim())  # remove top and bottom gaps with plot frame
+drawdowns = np.repeat(False, SP_ESG['ESG-SP500_cum'].size)
+for peak, trough in zip(peaks, troughs):
+    drawdowns[np.arange(peak, trough+1)] = True
+ax.fill_between(np.arange(SP_ESG.index.size), *ax.get_ylim(), where=drawdowns,
+                facecolor='red', alpha=1)
+plt.show()
