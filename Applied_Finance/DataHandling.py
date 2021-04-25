@@ -3,7 +3,9 @@ import pandas as pd
 import pandas_datareader as reader
 from datetime import datetime
 from linearmodels.asset_pricing import LinearFactorModel
-
+# import sys
+# file = open('FamaMacBeth.txt', 'a')
+# sys.stdout = file
 
 # Creating the ESG Factor
 SP_ESG = pd.read_excel('SPXESUP.xlsx', index_col=0, header=0)
@@ -25,25 +27,27 @@ if SP_ESG.index[-1] >= datetime.now():
 
 SP_ESG['SP500'] = SP.to_frame()
 
-SP_ESG['ESG-SP500'] = SP_ESG.SPXESUP - SP_ESG.SP500
+SP_ESG['ESGF'] = SP_ESG.SPXESUP - SP_ESG.SP500
 
-SP_ESG['ESG-SP500_cum'] = (SP_ESG['ESG-SP500'] + 1).cumprod() - 1
+SP_ESG['ESG-SP500_cum'] = (SP_ESG['ESGF'] + 1).cumprod() - 1
 
 ESG = pd.DataFrame()
 
-ESG = (SP_ESG.SPXESUP - SP_ESG.SP500).to_frame()
-
+ESG = (SP_ESG.SP500-SP_ESG.SPXESUP).to_frame()
+SP_ESG.index = ESG.index.to_period('M')
 # reading in the fama french factors
 factors = reader.DataReader('F-F_Research_Data_5_Factors_2x3', 'famafrench',start, datetime(2021, 1, 31))[0]/100
 # factors.index= factors.index.to_timestamp(freq='M', how='s')
 
-factors_merged = pd.merge(factors, ESG, left_index=True, right_index=True)
+ESGF = SP_ESG['ESGF'].T
+# print(ESGF.index)
+factors_merged = factors.copy()
+# print(factors_merged.index)
+factors_merged = factors_merged.drop('RF', axis=1)
+factors_merged['ESGF'] =ESGF
 
-header = ['Mkt-RF' ,'SMB', 'HML', 'RMW', 'CMA', 'RF', 'ESG'] # added the ESG header name, we should come up with a new one
-
-factors_merged.columns = header
-
-# factors_merged.index.to_period('M')
+print(f'factors loaded')
+#
 
 
 
@@ -51,8 +55,28 @@ factors_merged.columns = header
 
 # Reading the main xlsx file of portfolios
 funds = pd.read_excel('USmutual.xlsx')
+# funds = funds.astype(float)
+print(f'funds loaded')
 
 
+
+
+
+
+funds_ESG = funds[funds['Percent of AUM Covered - ESG']== 100]
+print(funds_ESG['Historical Sustainability Score'].min())
+print(funds_ESG['Historical Sustainability Score'].max())
+
+
+funds_ESG['number'] =pd.qcut(funds_ESG['Historical Sustainability Score'], q = 5, labels = False)
+
+
+funds_ESG['number'].value_counts()
+esg_weight = funds_ESG['number'].unique()
+esg_weight = esg_weight.tolist()
+esg_weight.sort()
+
+esg_dict = {elem : funds_ESG[funds_ESG['number'] == elem] for elem in esg_weight}
 
 
 
@@ -78,11 +102,12 @@ for fund in funds_list:
 funds_list = [fund.replace(" ","_").replace("-","_") for fund in funds_list]
 
 
-from datetime import datetime as dt
+#from datetime import datetime as dt
 #Cleaning for performance data
 for fund in fund_dict:
     fund_dict[fund] = fund_dict[fund].iloc[:, 26:280]
     fund_dict[fund] = fund_dict[fund].T
+    # fund_dict[fund] = fund_dict[fund].astype(float)
     new_header = fund_dict[fund].iloc[0]
     fund_dict[fund] = fund_dict[fund][1:]
     fund_dict[fund].columns = new_header
@@ -106,27 +131,45 @@ for fund in fund_dict:
     fund_dict[fund] = fund_dict[fund].loc[start:end]
     # fund_dict[fund].to_period('M')
 
-# Changing to PeriodIndex
-for fund in fund_dict:
-    fund_dict[fund] = fund_dict[fund].to_period('M')
+# # Changing to PeriodIndex
+# for fund in fund_dict:
+#     fund_dict[fund] = fund_dict[fund].to_period('M')
 
-# Changing input from object to float64
+# Changing input from object to float64 and subtract the risk free
 for fund in fund_dict:
     cols = fund_dict[fund].columns[fund_dict[fund].dtypes.eq(object)]
     fund_dict[fund][cols] = fund_dict[fund][cols].apply(pd.to_numeric, errors='coerce')
+    fund_dict[fund] = fund_dict[fund].sub(factors.RF, axis=0)
 
+
+
+# OLS
 #Fama MacBeth implemention
 
+import sys
+file = open('PM.txt', 'a')
+sys.stdout = file
+
 risk_premia =[]
+risk_premia_tstats = []
+rsquared = []
 for fund in fund_dict:
     mod = LinearFactorModel(portfolios=fund_dict[fund],
-                        factors=factors)
+                    factors=factors_merged)
     res = mod.fit(cov_type='robust')
 
-    print(res.risk_premia)
+    print(f'{fund} Riskpremia: {res.risk_premia} \n')
+    print(f'\n')
+    print(f'{fund} t stats: {res.risk_premia_tstats} \n')
+    print(f'\n')
+    print(f'{fund} R^2: {res.rsquared} \n')
+    risk_premia_tstats.append(res.risk_premia_tstats)
     risk_premia.append(res.risk_premia)
+    rsquared.append(res.rsquared)
+    print(f'{fund} results added \n')
 
-
+file.close()
+print(f'Calculation the whole data series')
 # Create total DataFrame
 Total = pd.DataFrame()
 Total = funds[funds['Ticker'].notnull()]
@@ -145,21 +188,41 @@ Total = Total.to_period('M')
 Total=Total.astype(float)
 
 Total = Total.loc[:,~Total.columns.duplicated()]
-
-
+#
+#
 mod = LinearFactorModel(portfolios=Total,
-                        factors=factors)
+                        factors=factors_merged)
 res = mod.fit(cov_type='robust')
+print(f'Total DataFrame:\n {res.risk_premia}')
 
 print(res.risk_premia)
-risk_premia.append(res.risk_premia)
+# risk_premia.append(res.risk_premia)
+#
 
-fund_dict['Total'] = Total
+# keys = [fund_dict.keys(), 'Total']
+#
+# Total ={
+#     'Mkt-RF' : 0.010843 ,
+#     'SMB' : 0.000136 ,
+#     'HML' : -0.007313 ,
+#     'RMW' : 0.001359 ,
+#     'CMA' : -0.001465 ,
+#     'ESFG' : 0.000394 }
 
+# risk_premia.append(Total)
+#
+# fund_dict['Total'] = Total
+# print(res.risk_premia)
+# Mkt-RF    0.010843
+# SMB       0.000136
+# HML      -0.007313
+# RMW       0.001359
+# CMA      -0.001465
+# ESFG      0.000394
 
 risk_premia = pd.DataFrame(risk_premia,
                        index=fund_dict.keys(),
-                       columns=factors.columns.tolist())
+                       columns=factors_merged.columns.tolist())
 risk_premia.info()
 
 print(risk_premia.to_latex())
@@ -167,27 +230,42 @@ print(risk_premia.to_latex())
 
 #downback plot - Not in use at the moment
 
-import matplotlib.pyplot as plt
-from scipy.signal import find_peaks
-import pandas_market_calendars as mcal
-import numpy as np
+# graph_df = SP_ESG.copy()
+#
+# graph_df.index = graph_df.index.to_timestamp()
+#
+# graph_df.index = graph_df.index.strftime('%d-%m-%Y')
+#
+#
+# import matplotlib.pyplot as plt
+# from scipy.signal import find_peaks
+# import pandas_market_calendars as mcal
+# import numpy as np
+#
+# fig, ax = plt.subplots()
+# ax = SP_ESG['ESG-SP500_cum'].plot(figsize=(15, 10), use_index=False, ylabel='Cummalative Return ESG index')
+# ax.set_xlim(0, SP_ESG.index.size-1)
+# ax.grid(axis='x', alpha=0.3)
+#
+# peaks, _ = find_peaks(SP_ESG['ESG-SP500_cum'], width=8)#, prominence=1)
+# troughs, _ = find_peaks(-SP_ESG['ESG-SP500_cum'], width=2)#, prominence=1)
+# for peak, trough in zip(peaks, troughs):
+#     ax.axvspan(peak, trough, facecolor='red', alpha=.2)
+#
+# ax.set_ylim(*ax.get_ylim())  # remove top and bottom gaps with plot frame
+# drawdowns = np.repeat(False, SP_ESG['ESG-SP500_cum'].size)
+# for peak, trough in zip(peaks, troughs):
+#     drawdowns[np.arange(peak, trough+1)] = True
+# ax.fill_between(np.arange(SP_ESG.index.size), *ax.get_ylim(), where=drawdowns,
+#                 facecolor='red', alpha=0.2)
+# plt.show()
+#
+# graph_df.to_excel('ESG_data.xlsx')
+#
+#
+# factors_merged.describe(include=all).T.to_latex()
 
-fig, ax = plt.subplots()
-ax = SP_ESG['ESG-SP500_cum'].plot(figsize=(10, 5), use_index=False, ylabel='Cummalative Return ESG index')
-ax.set_xlim(0, SP_ESG.index.size-1)
-ax.grid(axis='x', alpha=0.3)
 
 
 
-peaks, _ = find_peaks(SP_ESG['ESG-SP500_cum'], width=7, prominence=4)
-troughs, _ = find_peaks(-SP_ESG['ESG-SP500_cum'], width=7, prominence=4)
-for peak, trough in zip(peaks, troughs):
-    ax.axvspan(peak, trough, facecolor='red', alpha=.2)
-
-ax.set_ylim(*ax.get_ylim())  # remove top and bottom gaps with plot frame
-drawdowns = np.repeat(False, SP_ESG['ESG-SP500_cum'].size)
-for peak, trough in zip(peaks, troughs):
-    drawdowns[np.arange(peak, trough+1)] = True
-ax.fill_between(np.arange(SP_ESG.index.size), *ax.get_ylim(), where=drawdowns,
-                facecolor='red', alpha=1)
-plt.show()
+file.close()
